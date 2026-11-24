@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="RK Renko V4 // Quant Trading Grid — Multi-pane Renko trading dashboard with MT5 integration">
+    <title>RK Renko V4 // Quant Trading Grid</title>
+    <script>
+        window.onerror = function(message, source, lineno, colno, error) {
+            fetch('/api/log_error', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message, source, lineno, colno, stack: error ? error.stack : '' })
+            }).catch(() => {});
+            return false;
+        };
+    </script>
+
+    <!-- Modern Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- TradingView Lightweight Charts Library (Local) -->
+    <script src="/static/js/lightweight-charts.standalone.production.js"></script>
+
+    <!-- Pure JS Technical Indicators Engine -->
+    <script src="/static/js/indicators.js?v=2.2.0"></script>
+
+    <!-- Local White Theme Stylesheets -->
+    <link rel="stylesheet" href="/static/css/style.css?v=2.4.0">
+    <link rel="stylesheet" href="/static/css/trading.css?v=2.0.0">
+</head>
+<body>
+    <div class="dashboard-wrapper">
+
+        <!-- ─────────────────────── Premium White Header ─────────────────────── -->
+        <header class="main-header">
+            <div class="header-branding">
+                <div class="glow-indicator"></div>
+                <h1>QUANT TRADING <span>// RK RENKO V4</span></h1>
+            </div>
+
+            <div class="header-controls">
+                <!-- Multi-Pane Layout Selector -->
+                <div class="control-group">
+                    <label for="chart-count-select">PANES</label>
+                    <select id="chart-count-select" class="custom-select pane-count-select-native" aria-hidden="true" tabindex="-1">
+                        <option value="1">1 Pane</option>
+                        <option value="2">2 Panes</option>
+                        <option value="4">4 Panes</option>
+                        <option value="6" selected>6 Panes</option>
+                        <option value="8">8 Panes</option>
+                    </select>
+                    <div class="pane-layout-toggle" role="radiogroup" aria-label="Number of chart panes">
+                        <button type="button" class="pane-layout-btn" data-pane-count="1" role="radio" aria-checked="false" title="1 Pane">
+                            <span class="pane-layout-icon layout-1" aria-hidden="true"><i></i></span>
+                            <span class="pane-layout-count">1</span>
+                        </button>
+                        <button type="button" class="pane-layout-btn" data-pane-count="2" role="radio" aria-checked="false" title="2 Panes">
+                            <span class="pane-layout-icon layout-2" aria-hidden="true"><i></i><i></i></span>
+                            <span class="pane-layout-count">2</span>
+                        </button>
+                        <button type="button" class="pane-layout-btn" data-pane-count="4" role="radio" aria-checked="false" title="4 Panes">
+                            <span class="pane-layout-icon layout-4" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+                            <span class="pane-layout-count">4</span>
+                        </button>
+                        <button type="button" class="pane-layout-btn active" data-pane-count="6" role="radio" aria-checked="true" title="6 Panes">
+                            <span class="pane-layout-icon layout-6" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span>
+                            <span class="pane-layout-count">6</span>
+                        </button>
+                        <button type="button" class="pane-layout-btn" data-pane-count="8" role="radio" aria-checked="false" title="8 Panes">
+                            <span class="pane-layout-icon layout-8" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+                            <span class="pane-layout-count">8</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Global Execution Mode (Paper vs Live MT5) -->
+                <div class="mode-toggle-group" id="header-mode-toggle" title="Switch between Paper Trading and Live MT5 Execution">
+                    <button type="button" class="btn-mode-toggle active" data-mode="paper" id="btn-mode-paper">PAPER</button>
+                    <button type="button" class="btn-mode-toggle" data-mode="live" id="btn-mode-live">LIVE</button>
+                </div>
+
+                <!-- Global Bot Master Buttons -->
+                <div class="control-group">
+                    <button type="button" id="btn-start-all-bots" class="btn-master btn-master-start" title="Start all configured bots">▶ Start All</button>
+                    <button type="button" id="btn-stop-all-bots" class="btn-master btn-master-stop" title="Stop all running bots">⏹ Stop All</button>
+                    <button type="button" id="btn-panic-close-all" class="btn-master btn-master-panic" title="Panic close all positions">⚠ Close All</button>
+                    <button type="button" id="btn-toggle-terminal" class="btn-master btn-terminal-toggle" title="Toggle Terminal Console Drawer">📟 Terminal <span id="terminal-unread-badge" class="terminal-badge">0</span></button>
+                </div>
+
+                <!-- MT5 Account Summary Pill -->
+                <div class="account-summary-bar" id="header-account-summary">
+                    <span class="account-stat"><span class="stat-label">BAL:</span> <span class="stat-value" id="acc-balance">--</span></span>
+                    <span class="account-stat"><span class="stat-label">EQ:</span> <span class="stat-value" id="acc-equity">--</span></span>
+                    <span class="account-stat"><span class="stat-label">PNL:</span> <span class="stat-value" id="acc-pnl">--</span></span>
+                </div>
+
+                <!-- MT5 Connection Status -->
+                <div class="mt5-status-badge disconnected" id="mt5-status-panel" title="Click to test MT5 Connection">
+                    <span class="status-dot"></span>
+                    <span class="status-label">MT5: DISCONNECTED</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- ─────────────────────── Chart Grid ─────────────────────── -->
+        <main class="grid-container charts-grid" id="charts-grid"></main>
+
+        <!-- ─────────────────────── Bottom Terminal Console Drawer ─────────────────────── -->
+        <div class="terminal-console-drawer" id="terminal-console-drawer">
+            <div class="terminal-header">
+                <div class="terminal-title-area">
+                    <span class="terminal-title">📟 Terminal Console Log</span>
+                    <span class="terminal-badge" id="terminal-log-count">0 logs</span>
+                </div>
+                <div class="terminal-controls">
+                    <select id="terminal-symbol-filter" class="terminal-select">
+                        <option value="ALL">All Symbols</option>
+                        <option value="GBPUSD">GBPUSD</option>
+                        <option value="EURUSD">EURUSD</option>
+                        <option value="XAUUSD">XAUUSD</option>
+                        <option value="BTCUSD">BTCUSD</option>
+                        <option value="USDJPY">USDJPY</option>
+                        <option value="AUDUSD">AUDUSD</option>
+                        <option value="EURJPY">EURJPY</option>
+                    </select>
+                    <div class="terminal-level-chips">
+                        <button type="button" class="log-chip active" data-level="ALL">ALL</button>
+                        <button type="button" class="log-chip" data-level="TRADES">TRADES</button>
+                        <button type="button" class="log-chip" data-level="INFO">INFO</button>
+                        <button type="button" class="log-chip" data-level="WARN">WARN</button>
+                        <button type="button" class="log-chip" data-level="ERROR">ERROR</button>
+                    </div>
+                    <input type="text" id="terminal-search-input" class="terminal-search-input" placeholder="Search logs...">
+                    <button type="button" id="btn-terminal-autoscroll" class="btn-terminal-action active" title="Lock auto-scroll to bottom">Auto-Scroll</button>
+                    <button type="button" id="btn-terminal-clear" class="btn-terminal-action" title="Clear console">Clear</button>
+                    <button type="button" id="btn-terminal-copy" class="btn-terminal-action" title="Copy visible logs">Copy</button>
+                    <button type="button" id="btn-terminal-collapse" class="btn-terminal-action" title="Minimize / Expand console">▼</button>
+                </div>
+            </div>
+            <div class="terminal-body" id="terminal-log-body"></div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════ Pane Template ═══════════════════ -->
+    <template id="chart-pane-template">
+        <div class="chart-pane" data-pane-id="">
+
+            <!-- ── Pane Header Controls ── -->
+            <div class="pane-header">
+                <div class="pane-title">PANE #<span class="pane-num">1</span></div>
+
+                <div class="pane-settings">
+                    <select class="pane-source-select custom-select-sm">
+                        <option value="mt5" selected>MetaTrader 5 (FX/CFD)</option>
+                        <option value="hyperliquid">Hyperliquid (Crypto)</option>
+                        <option value="yfinance">yfinance (Indian Stocks)</option>
+                    </select>
+
+                    <div class="symbol-input-wrapper">
+                        <input type="text" class="pane-symbol-input" placeholder="Symbol" value="GBPUSD" list="symbols-datalist">
+                    </div>
+
+                    <select class="pane-tf-select custom-select-sm">
+                        <option value="renko" selected>RENKO</option>
+                        <option value="1m">1m</option>
+                        <option value="5m">5m</option>
+                        <option value="15m">15m</option>
+                        <option value="1h">1h</option>
+                        <option value="4h">4h</option>
+                        <option value="1d">1d</option>
+                    </select>
+
+                    <div class="renko-controls-strip">
+                        <span class="renko-brick-badge" title="Calculated Dynamic or Fixed Brick Size">BRICK: --</span>
+                        <button type="button" class="renko-timeline-toggle active" title="Toggle Equidistant vs Real-Time spacing">EQ</button>
+                    </div>
+                    <button type="button" class="btn-pane-autoscale" title="Reset Price Scale & Auto-Fit (or double-click chart)">AUTO</button>
+                </div>
+            </div>
+
+            <!-- ── Pane Bot Bar ── -->
+            <div class="pane-bot-bar">
+                <div class="pane-bot-left">
+                    <span class="bot-status-badge bot-status-stopped">STOPPED</span>
+                    <button type="button" class="bot-pane-mode-btn mode-paper" title="Execution Mode: Click to toggle Paper vs Live MT5">PAPER</button>
+                    <button type="button" class="btn-bot-action btn-bot-start">Start</button>
+                    <button type="button" class="btn-bot-adjust" title="Adjust bot parameters">⚙ Adjust</button>
+                </div>
+                <div class="pane-bot-right">
+                    <span class="streak-pill streak-neutral" title="Renko Brick Streak bar_num">STREAK: 0</span>
+                    <span class="pos-pill hidden" title="Active Open Position">
+                        <span class="pos-info">--</span>
+                        <span class="btn-quick-close" title="Close Position">✕</span>
+                    </span>
+                </div>
+            </div>
+
+            <!-- ── Color-coded Price Ticker ── -->
+            <div class="ticker-bar">
+                <span class="ticker-symbol">GBPUSD</span>
+                <span class="ticker-price">--</span>
+                <span class="ticker-direction">--</span>
+                <span class="renko-crosshair-stats"></span>
+            </div>
+
+            <!-- ── Indicator Toolbar ── -->
+            <div class="indicator-toolbar" aria-label="Chart analysis toolbar">
+                <div class="ind-section ind-section-primary">
+                    <span class="ind-group-label">Indicators</span>
+                    <button class="indicator-library-btn" title="Open indicator library" aria-label="Open indicator library">+</button>
+                    <button class="ind-chip" data-indicator="supertrend" title="Supertrend (1, 3.1)">ST</button>
+                    <button class="ind-chip" data-indicator="ai_renko"   title="Dr Devendra AI Smart Renko V1.1">AI Renko</button>
+                    <button class="ind-chip" data-indicator="ema9"      title="Exponential Moving Average 9">EMA 9</button>
+                    <button class="ind-chip" data-indicator="sma20"     title="Simple Moving Average 20">SMA 20</button>
+                    <button class="ind-chip" data-indicator="sma50"     title="Simple Moving Average 50">SMA 50</button>
+                    <button class="ind-chip" data-indicator="bb20"      title="Bollinger Bands 20,2">BB</button>
+                    <button class="ind-chip" data-indicator="vwap"      title="Volume Weighted Average Price">VWAP</button>
+                    <div class="ind-chip-group">
+                        <button class="ind-chip" data-indicator="smc" title="Smart Money Concepts">SMC</button>
+                        <button class="ind-settings-icon" data-indicator="smc" title="SMC Settings" aria-label="SMC Settings">&#9881;</button>
+                    </div>
+                </div>
+
+                <div class="ind-separator"></div>
+
+                <div class="ind-section">
+                    <span class="ind-group-label">Panels</span>
+                    <button class="ind-chip" data-indicator="rsi14"     title="RSI 14">RSI</button>
+                    <button class="ind-chip" data-indicator="macd"      title="MACD 12,26,9">MACD</button>
+                    <button class="ind-chip" data-indicator="volume"    title="Volume Bars">VOL</button>
+                </div>
+
+                <div class="ind-separator"></div>
+
+                <div class="ind-section ind-section-tools">
+                    <span class="ind-group-label">Draw</span>
+                    <button class="tool-chip" data-tool="hline"    title="Horizontal Line" aria-label="Horizontal Line">—</button>
+                    <button class="tool-chip" data-tool="tline"    title="Trend Line" aria-label="Trend Line">↗</button>
+                    <button class="tool-chip" data-tool="rect"     title="Rectangle / Box" aria-label="Rectangle / Box">▭</button>
+                    <button class="tool-chip tool-erase" data-tool="erase" title="Erase last drawing" aria-label="Erase last drawing">✕</button>
+                </div>
+            </div>
+
+            <!-- ── Main Chart Mount ── -->
+            <div class="chart-mount">
+                <div class="trading-overlay-container"></div>
+                <div class="indicator-legend" aria-label="Active chart indicators"></div>
+                
+                <div class="pane-loading-overlay">
+                    <div class="spinner"></div>
+                    <span class="loading-text">Fetching historical data...</span>
+                </div>
+            </div>
+
+            <!-- ── Sub-pane Oscillators ── -->
+            <div class="oscillators-container hidden"></div>
+        </div>
+    </template>
+
+    <!-- Global Symbol Datalist -->
+    <datalist id="symbols-datalist">
+        <option value="GBPUSD">GBPUSD (Forex Major)</option>
+        <option value="EURUSD">EURUSD (Forex Major)</option>
+        <option value="XAUUSD">XAUUSD / Gold (Commodity)</option>
+        <option value="BTCUSD">BTCUSD (Crypto)</option>
+        <option value="USDJPY">USDJPY (Forex Major)</option>
+        <option value="AUDUSD">AUDUSD (Forex Major)</option>
+        <option value="EURJPY">EURJPY (Forex Cross)</option>
+        <option value="BTC">BTC (Hyperliquid)</option>
+        <option value="ETH">ETH (Hyperliquid)</option>
+        <option value="SOL">SOL (Hyperliquid)</option>
+        <option value="RELIANCE.NS">RELIANCE (yfinance)</option>
+        <option value="TCS.NS">TCS (yfinance)</option>
+    </datalist>
+
+    <!-- ═══════════════════ Bot Adjustments Modal ═══════════════════ -->
+    <div id="adjustments-modal" class="adjustments-modal hidden" role="dialog" aria-modal="true">
+        <div class="adjustments-header">
+            <div>
+                <h3>⚙️ Bot Adjustments</h3>
+                <span class="adjustments-target-pill" id="adjust-target-symbol">GBPUSD</span>
+            </div>
+            <button type="button" class="close-settings-btn" id="adjust-modal-close" aria-label="Close modal">✕</button>
+        </div>
+        <div class="adjustments-tabs">
+            <button type="button" class="adjust-tab-btn active" data-tab="tab-risk">Execution & Risk</button>
+            <button type="button" class="adjust-tab-btn" data-tab="tab-brick">Brick Sizing & ATR</button>
+            <button type="button" class="adjust-tab-btn" data-tab="tab-zones">Zones & Confluence</button>
+        </div>
+        <div class="adjustments-body">
+            <!-- Tab 1: Execution & Risk -->
+            <div id="tab-risk" class="adjust-tab-content active">
+                <div class="adjust-grid">
+                    <div class="adjust-field">
+                        <label for="adj-lot-size">Lot Size</label>
+                        <input type="number" id="adj-lot-size" class="adjust-input" step="0.01" min="0.01" value="0.01">
+                    </div>
+                    <div class="adjust-field">
+                        <label for="adj-sl-bricks">Stop Loss (Bricks)</label>
+                        <input type="number" id="adj-sl-bricks" class="adjust-input" step="0.5" min="1.0" value="5.0">
+                    </div>
+                    <div class="adjust-field">
+                        <label for="adj-tp-r">Take Profit (R Multiple, 0=None)</label>
+                        <input type="number" id="adj-tp-r" class="adjust-input" step="0.5" min="0.0" value="0.0">
+                    </div>
+                    <div class="adjust-field">
+                        <label for="adj-trail-act">Trailing Activation (Bricks)</label>
+                        <input type="number" id="adj-trail-act" class="adjust-input" step="0.5" min="1.0" value="4.0">
+                    </div>
+                    <div class="adjust-field">
+                        <label for="adj-trail-dist">Trailing Distance (Bricks)</label>
+                        <input type="number" id="adj-trail-dist" class="adjust-input" step="0.5" min="1.0" value="4.0">
+                    </div>
+                    <div class="adjust-field">
+                        <label for="adj-max-daily">Max Daily Trades</label>
+                        <input type="number" id="adj-max-daily" class="adjust-input" step="1" min="1" value="12">
+                    </div>
+                </div>
+                <div style="margin-top: 12px;">
+                    <div class="adjust-toggle-row">
+                        <label for="adj-enable-trailing">Enable Trailing Stop Engine</label>
+                        <input type="checkbox" id="adj-enable-trailing" checked>
+                    </div>
+                    <div class="adjust-toggle-row">
+                        <label for="adj-early-exit">Enable Early Reversal Exit (bar_num +/-2)</label>
+                        <input type="checkbox" id="adj-early-exit" checked>
+                    </div>
+                    <div class="adjust-toggle-row">
+                        <label for="adj-execution-live">Execution Mode (Checked = LIVE MT5, Unchecked = PAPER)</label>
+                        <input type="checkbox" id="adj-execution-live">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 2: Brick Sizing & ATR -->
+            <div id="tab-brick" class="adjust-tab-content">
+                <div class="adjust-grid">
+                    <div class="adjust-field">
+                        <label for="adj-fixed-brick">Fixed Brick Override (0 = Dynamic ATR)</label>
+                        <input type="number" id="adj-fixed-brick" class="adjust-input" step="0.0001" min="0.0" value="0.0">
+                    </div>
+                    <div class="adjust-field">
+                        <label for="adj-atr-period">ATR Period</label>
+                        <input type="number" id="adj-atr-period" class="adjust-input" step="1" min="1" value="5">
+                    </div>
+                    <div class="adjust-field">
+                        <label for="adj-atr-divisor">ATR Divisor</label>
+                        <input type="number" id="adj-atr-divisor" class="adjust-input" step="1" min="1" value="22">
+                    </div>
+                    <div class="adjust-field">
+                        <label for="adj-session-hours">Session Hours</label>
+                        <input type="number" id="adj-session-hours" class="adjust-input" step="1" min="1" max="24" value="22">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 3: Zones & Confluence -->
+            <div id="tab-zones" class="adjust-tab-content">
+                <div class="adjust-toggle-row">
+                    <label for="adj-enable-zones">Enable Reference Zone Engine (Shadow, IB, FR, 12:30, 17:30)</label>
+                    <input type="checkbox" id="adj-enable-zones">
+                </div>
+                <div class="adjust-toggle-row">
+                    <label for="adj-zone-only">Restrict strictly to Zone Trades (No Mid-Air Trades)</label>
+                    <input type="checkbox" id="adj-zone-only">
+                </div>
+                <div class="adjust-toggle-row">
+                    <label for="adj-h1-ema50">Enable 1H EMA 50 Macro Filter</label>
+                    <input type="checkbox" id="adj-h1-ema50" checked>
+                </div>
+                <div class="adjust-toggle-row">
+                    <label for="adj-renko-ema">Enable Renko EMA 5/9 Filter</label>
+                    <input type="checkbox" id="adj-renko-ema" checked>
+                </div>
+                <div class="adjust-toggle-row">
+                    <label for="adj-firstred-shadow">Enable FirstRed-Shadow Structural Rule</label>
+                    <input type="checkbox" id="adj-firstred-shadow">
+                </div>
+                <div class="adjust-grid" style="margin-top: 10px;">
+                    <div class="adjust-field">
+                        <label for="adj-zone-streak">Zone Streak Bricks Threshold</label>
+                        <input type="number" id="adj-zone-streak" class="adjust-input" step="1" min="1" value="3">
+                    </div>
+                    <div class="adjust-field">
+                        <label for="adj-min-trend">Min Trend Bricks (Mid-Air)</label>
+                        <input type="number" id="adj-min-trend" class="adjust-input" step="1" min="1" value="2">
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="adjustments-footer">
+            <button type="button" id="btn-adjust-reset" class="btn-secondary">Reset Defaults</button>
+            <button type="button" id="btn-adjust-apply-all" class="btn-secondary">Apply to All Bots</button>
+            <button type="button" id="btn-adjust-save" class="btn-primary">Save & Apply to Bot</button>
+        </div>
+    </div>
+    <div id="modal-backdrop" class="modal-backdrop hidden"></div>
+
+    <!-- Indicator Library Modal -->
+    <div id="indicator-library-dialog" class="indicator-library-modal hidden" role="dialog" aria-modal="true" aria-labelledby="indicator-library-title">
+        <div class="indicator-library-header">
+            <div class="indicator-library-header-info">
+                <span class="indicator-header-badge">INDICATORS</span>
+                <div>
+                    <h3 id="indicator-library-title">Indicators & Overlays</h3>
+                    <span id="indicator-library-pane-label" class="indicator-header-pane-tag">Pane #1 · EURUSD · 1m</span>
+                </div>
+            </div>
+            <button class="close-settings-btn" id="indicator-library-close" aria-label="Close indicator library">✕</button>
+        </div>
+        <div class="indicator-library-body">
+            <!-- Left Sidebar: Search, Category Bar, and Categorized List -->
+            <div class="indicator-library-sidebar">
+                <div class="indicator-library-search-box">
+                    <span class="search-box-icon">🔍</span>
+                    <input type="search" id="indicator-library-search" placeholder="Search indicators..." autocomplete="off">
+                </div>
+                <div class="indicator-category-tabs" id="indicator-category-tabs" style="display: flex; gap: 4px; overflow-x: auto; padding: 6px 10px; border-bottom: 1px solid var(--border-color, #E2E8F0); background: #F8FAFC; scrollbar-width: none;"></div>
+                <div class="indicator-list" id="indicator-library-list"></div>
+            </div>
+            <!-- Right Panel: Settings and Actions -->
+            <div class="indicator-settings-panel">
+                <div class="indicator-settings-header">
+                    <span id="indicator-settings-category" class="indicator-type-pill">Technical Indicator</span>
+                    <h4 id="indicator-settings-name">Select an indicator</h4>
+                    <p id="indicator-settings-desc" class="indicator-settings-desc">Configure parameters and inputs for this chart pane.</p>
+                </div>
+                <div class="indicator-settings-scroll">
+                    <div id="indicator-settings-fields" class="indicator-settings-fields"></div>
+                </div>
+                <div class="indicator-settings-actions">
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <button type="button" id="indicator-library-remove" class="btn-secondary">Remove</button>
+                        <button type="button" id="indicator-library-visibility" class="btn-secondary" title="Toggle visibility" style="display: none;">👁 Show / Hide</button>
+                    </div>
+                    <button type="button" id="indicator-library-apply" class="btn-primary">Add / Apply</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SMC Settings Dialog [LuxAlgo] -->
+    <div id="smc-settings-dialog" class="settings-modal smc-settings-modal hidden" role="dialog" aria-modal="true">
+        <div class="settings-header">
+            <div class="smc-modal-header-title">
+                <span class="indicator-header-badge">LUXALGO</span>
+                <h3 style="margin: 0; font-size: 15px; font-weight: 700;">Smart Money Concepts</h3>
+            </div>
+            <button class="close-settings-btn" id="smc-settings-close">✕</button>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="smc-tabs-header">
+            <button type="button" class="smc-tab-btn active" data-tab="smc-tab-general">General</button>
+            <button type="button" class="smc-tab-btn" data-tab="smc-tab-structure">Structure</button>
+            <button type="button" class="smc-tab-btn" data-tab="smc-tab-blocks">Order Blocks</button>
+            <button type="button" class="smc-tab-btn" data-tab="smc-tab-gaps">EQH / FVGs</button>
+            <button type="button" class="smc-tab-btn" data-tab="smc-tab-zones">Zones & MTF</button>
+        </div>
+
+        <div class="settings-body smc-settings-body">
+            <!-- TAB 1: GENERAL -->
+            <div id="smc-tab-general" class="smc-tab-pane active">
+                <div class="smc-setting-row">
+                    <label for="smc-cfg-mode">Display Mode</label>
+                    <select id="smc-cfg-mode" class="smc-select">
+                        <option value="Historical" selected>Historical</option>
+                        <option value="Present">Present</option>
+                    </select>
+                </div>
+                <div class="smc-setting-row">
+                    <label for="smc-cfg-style">Color Style</label>
+                    <select id="smc-cfg-style" class="smc-select">
+                        <option value="Colored" selected>Colored</option>
+                        <option value="Monochrome">Monochrome</option>
+                    </select>
+                </div>
+                <div class="smc-setting-row">
+                    <div>
+                        <label for="smc-cfg-showTrend">Color Candles by Trend</label>
+                        <div class="smc-setting-sub">Tints candle bodies by real-time structure bias</div>
+                    </div>
+                    <input type="checkbox" id="smc-cfg-showTrend" class="smc-checkbox">
+                </div>
+            </div>
+
+            <!-- TAB 2: STRUCTURE -->
+            <div id="smc-tab-structure" class="smc-tab-pane">
+                <div class="smc-section-heading">Swing Structure</div>
+                <div class="smc-setting-row">
+                    <label for="smc-cfg-showStructure">Show Swing Structure</label>
+                    <input type="checkbox" id="smc-cfg-showStructure" class="smc-checkbox" checked>
+                </div>
+                <div class="smc-setting-row">
+                    <label for="smc-cfg-swingsLength">Swing Detection Length</label>
+                    <input type="number" id="smc-cfg-swingsLength" class="smc-input" min="10" max="200" value="50">
+                </div>
+                <div class="smc-setting-row">
+                    <label for="smc-cfg-showSwingBull">Swing Bullish Filter</label>
+                    <select id="smc-cfg-showSwingBull" class="smc-select">
+                        <option value="All" selected>All</option>
+                        <option value="BOS">BOS Only</option>
+                        <option value="CHoCH">CHoCH Only</option>
+                    </select>
+                </div>
+                <div class="smc-setting-row">
+                    <label for="smc-cfg-showSwingBear">Swing Bearish Filter</label>
+                    <select id="smc-cfg-showSwingBear" class="smc-select">
+                        <option value="All" selected>All</option>
+                        <option value="BOS">BOS Only</option>
+                        <option value="CHoCH">CHoCH Only</option>
+                    </select>
+                </div>
+                <div class="smc-setting-row">
+                    <label for="smc-cfg-showSwings">Show Swing Points (HH/LL/HL/LH)</label>
+                    <input type="checkbox" id="smc-cfg-showSwings" class="smc-checkbox">
+                </div>
+                <div class="smc-setting-row">
+                    <label for="smc-cfg-showHighLowSwings">Show Strong / Weak High/Low</label>
+                    <input type="checkbox" id="smc-cfg-showHighLowSwings" class="smc-checkbox" checked>
+                </div>
+
+                <div class="smc-section-heading" style="margin-top: 14px;">Internal Structure</div>
+                <div class="smc-setting-row">
+                    <label for="smc-cfg-showInternals">Show Internal Structure</label>
+                    <input type="checkbox" id="smc-cfg-showInternals" class="smc-checkbox" checked>
+                </div>
+                <div class="smc-setting-row">
+                    <label for="smc-cfg-showInternalBull">Internal Bullish Filter</label>
+                    <select id="smc-cfg-showInternalBull" class="smc-select">
+                        <option value="All" selected>All</option>
+                        <option value="BOS">BOS Only</option>
+                        <option value="CHoCH">CHoCH Only</option>
+                    </select>
+                </div>
+                <div class="smc-setting-row">
+                    <label for="smc-cfg-showInternalBear">Internal Bearish Filter</label>
+                    <select id="smc-cfg-showInternalBear" class="smc-select">
+                        <option value="All" selected>All</option>
+                        <option value="BOS">BOS Only</option>
+                        <option value="CHoCH">CHoCH Only</option>
+                    </select>
+                </div>
+                <div class="smc-setting-row">
+                    <label for="smc-cfg-internalFilterConfluence">Confluence Filter (Wicks)</label>
+                    <input type="checkbox" id="smc-cfg-internalFilterConfluence" class="smc-checkbox">
+                </div>
+            </div>
+
+            <!-- TAB 3: ORDER BLOCKS -->
+            <div id="smc-tab-blocks" class="smc-tab-pane">
+                <div class="smc-section-heading">Internal Order Blocks</div>
+                <div class="smc-setting-row">
+                    <label for="smc-cfg-showInternalOrderBlocks">Internal Order Blocks</label>
+                    <input type="checkbox" id="smc-cfg-showInternalOrderBlocks" class="smc-checkbox" checked>
+                </div>
+                <div class="smc-setting-row">
+                    <label for="smc-cfg-internalOrderBlocksSize">Max Internal OBs</label>
+                    <input type="number" id="smc-cfg-internalOrderBlocksSize" class="smc-input" min="1" max="20" value="5">
+                </div>
+
+                <div class="smc-section-heading" style="margin-top: 14px;">Swing Order Blocks</div>
+                <div class="smc-setting-row">
+                    <label for="smc-cfg-showSwingOrderBlocks">Swing Order Blocks</label>
+                    <input type="checkbox" id="smc-cfg-showSwingOrderBlocks" class="smc-checkbox">
+                </div>
+                <div class="smc-setting-row">
+                    <label for="smc-cfg-swingOrderBlocksSize">Max Swing OBs</label>
+                    <input type="number" id="smc-cfg-swingOrderBlocksSize" class="smc-input" min="1" max="20" value="5">
+                </div>
+
+                <div class="smc-section-heading" style="margin-top: 14px;">Filters & Mitigation</div>
+                <div class="smc-setting-row">
+                    <label for="smc-cfg-orderBlockFilter">Order Block Volatility Filter</label>
+                    <select id="smc-cfg-orderBlockFilter" class="smc-select">
+                        <option value="Atr" selected>ATR (200)</option>
+                        <option value="Cumulative Mean Range">Cumulative Mean Range</option>
+                    </select>
+                </div>
+                <div class="smc-setting-row">
+                    <label for="smc-cfg-orderBlockMitigation">Order Block Mitigation</label>
+                    <select id="smc-cfg-orderBlockMitigation" class="smc-select">
+                        <option value="High/Low" selected>High/Low</option>
+                        <option value="Close">Close</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- TAB 4: EQH/EQL & FVGs -->
+            <div id="smc-tab-gaps" class="smc-tab-pane">
+                <div class="smc-section-heading">Equal Highs & Lows (EQH / EQL)</div>
+                <div class="smc-setting-row">
+                    <label for="smc-cfg-showEqualHighsLows">Equal High / Low</label>
+                    <input type="checkbox" id="smc-cfg-showEqualHighsLows" class="smc-checkbox" checked>
+                </div>
+                <div class="smc-setting-row">
+                    <label for="smc-cfg-equalHighsLowsLength">Bars Confirmation</label>
+                    <input type="number" id="smc-cfg-equalHighsLowsLength" class="smc-input" min="1" max="20" value="3">
+                </div>
+                <div class="smc-setting-row">
+                    <label for="smc-cfg-equalHighsLowsThreshold">Sensitivity Threshold</label>
+                    <input type="number" id="smc-cfg-equalHighsLowsThreshold" class="smc-input" min="0" max="0.5" step="0.05" value="0.1">
+                </div>
+
+                <div class="smc-section-heading" style="margin-top: 14px;">Fair Value Gaps (FVG)</div>
+                <div class="smc-setting-row">
+                    <label for="smc-cfg-showFairValueGaps">Show Fair Value Gaps</label>
+                    <input type="checkbox" id="smc-cfg-showFairValueGaps" class="smc-checkbox">
+                </div>
+                <div class="smc-setting-row">
+                    <label for="smc-cfg-fairValueGapsThreshold">Auto Volatility Threshold</label>
+                    <input type="checkbox" id="smc-cfg-fairValueGapsThreshold" class="smc-checkbox" checked>
+                </div>
+                <div class="smc-setting-row">
+                    <label for="smc-cfg-fairValueGapsExtend">Extend FVG Boxes (Bars)</label>
+                    <input type="number" id="smc-cfg-fairValueGapsExtend" class="smc-input" min="0" max="10" value="1">
+                </div>
+            </div>
+
+            <!-- TAB 5: ZONES & MTF -->
+            <div id="smc-tab-zones" class="smc-tab-pane">
+                <div class="smc-section-heading">Premium & Discount Zones</div>
+                <div class="smc-setting-row">
+                    <label for="smc-cfg-showPremiumDiscountZones">Show Premium / Discount Zones</label>
+                    <input type="checkbox" id="smc-cfg-showPremiumDiscountZones" class="smc-checkbox">
+                </div>
+
+                <div class="smc-section-heading" style="margin-top: 14px;">Multi-Timeframe Highs & Lows (MTF)</div>
+                <div class="smc-setting-row">
+                    <label for="smc-cfg-showDailyLevels">Daily High & Low (PDH / PDL)</label>
+                    <input type="checkbox" id="smc-cfg-showDailyLevels" class="smc-checkbox">
+                </div>
+                <div class="smc-setting-row">
+                    <label for="smc-cfg-showWeeklyLevels">Weekly High & Low (PWH / PWL)</label>
+                    <input type="checkbox" id="smc-cfg-showWeeklyLevels" class="smc-checkbox">
+                </div>
+                <div class="smc-setting-row">
+                    <label for="smc-cfg-showMonthlyLevels">Monthly High & Low (PMH / PML)</label>
+                    <input type="checkbox" id="smc-cfg-showMonthlyLevels" class="smc-checkbox">
+                </div>
+            </div>
+        </div>
+
+        <div class="settings-footer">
+            <button id="smc-settings-reset" class="btn-secondary" type="button">Reset Defaults</button>
+            <button id="smc-settings-save" class="btn-primary" type="button">Save & Apply</button>
+        </div>
+    </div>
+
+    <!-- Global Context Menu for Trading -->
+    <div id="chart-context-menu" class="context-menu hidden">
+        <div style="padding: 6px 12px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color);">
+            <label style="font-size: 11px; color: var(--text-muted);">Lot Size:</label>
+            <input type="number" id="cmenu-volume-input" value="0.01" step="0.01" min="0.01" style="width: 55px; border: 1px solid var(--border-color); padding: 2px 4px; border-radius: 4px; text-align: center; font-size: 11px;">
+        </div>
+        <div class="menu-item" id="cmenu-buy-limit">Buy <span class="cmenu-vol-disp">0.01</span> <span class="cmenu-symbol"></span> @ <span class="cmenu-price"></span> limit</div>
+        <div class="menu-item" id="cmenu-sell-limit">Sell <span class="cmenu-vol-disp">0.01</span> <span class="cmenu-symbol"></span> @ <span class="cmenu-price"></span> limit</div>
+        <div class="menu-separator"></div>
+        <div class="menu-item" id="cmenu-buy-stop">Buy <span class="cmenu-vol-disp">0.01</span> <span class="cmenu-symbol"></span> @ <span class="cmenu-price"></span> stop</div>
+        <div class="menu-item" id="cmenu-sell-stop">Sell <span class="cmenu-vol-disp">0.01</span> <span class="cmenu-symbol"></span> @ <span class="cmenu-price"></span> stop</div>
+        <div class="menu-separator"></div>
+        <div class="menu-item" id="cmenu-close-menu">Close Menu</div>
+    </div>
+
+    <!-- App Coordinator -->
+    <script src="/static/js/chart_manager.js?v=2.4.0"></script>
+</body>
+</html>
